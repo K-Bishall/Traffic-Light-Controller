@@ -23,11 +23,13 @@ end controller;
 
 architecture arch of controller is
 
-    -- type state is range 0 to 11;   -- number of states
-    -- signal presentState, nextState : state;
+    -- used in timer to generate delay
+    constant longCount : integer := 30; --count 30 clock pulses 
+    constant shortCount : integer := 10; --count 10 clock pulses
+
     signal state: integer range 0 to 11 := 0;
-    signal timeout: std_logic := '0'; -- flag '1' if timeout in any state
-    signal Tl, Ts: std_logic := '0';  -- signals to trigger timer function Tl - long time, Ts - short time
+    signal timeout: std_logic := '0'; -- flag : '1' if timeout in any state
+    signal Tl, Ts: std_logic := '0';  -- signals to trigger timer function : Tl - long time, Ts - short time
 
 begin
 
@@ -161,13 +163,31 @@ begin
                 --start timer
                 Tl <= '1';
                 timeout <= timer();      
-                          
+
         end case;
 
     end process;
 
     -- timer function
     function timer() return std_logic is
+        variable count : integer := 0;
+        if Tl = '1' then
+            while count <= longCount loop
+                if rising_edge(clk) then
+                    count := count +1;
+                end if;
+            end loop;
+            Tl <= '0';
+
+        elsif Ts = '1' then
+            while count <= shortCount loop
+                if rising_edge(clk) then
+                    count := count + 1;
+                end if;
+            end loop;
+            Ts <= '0';
+            
+        end if;
 
     end function;
 
