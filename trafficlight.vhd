@@ -12,12 +12,13 @@ use ieee.numeric_std.all;
 
 entity controller is
     port(clr: in std_logic;
+         clk: in std_logic;
          mode: in std_logic;
          green: out std_logic_vector(3 downto 0);
          yellow: out std_logic_vector(3 downto 0);
          red: out std_logic_vector(3 downto 0);
-         zebraRed: out std_logic(1 downto 0);
-         zebraGreen: out std_logic(1 downto 0));
+         zebraRed: out std_logic_vector(1 downto 0);
+         zebraGreen: out std_logic_vector(1 downto 0));
 end controller;
 
 
@@ -27,20 +28,20 @@ architecture arch of controller is
     constant longCount : integer := 30; --count 30 clock pulses 
     constant shortCount : integer := 10; --count 10 clock pulses
 
-    signal state: integer range 0 to 11 := 0;
+    signal state: integer range 0 to 11;
     signal timeout: std_logic := '0'; -- flag : '1' if timeout in any state
     signal Tl, Ts: std_logic := '0';  -- signals to trigger timer function : Tl - long time, Ts - short time
 
-begin
+begin --architecture
 
     -- sequential circuit to determine present state
-    seq: process (clr, mode, timeout)
+    seq: process (clr, mode, timeout, clk)
     begin
         if mode = '0' then
             if clr = '1' then
                 state <= 0;
-            elsif rising_edge(timeout) then
-                state <= state + 1;
+            elsif timeout = '1' and rising_edge(clk) then
+                state <= (state + 1) mod 12;
             end if;
 
         -- manual mode is to be added
@@ -50,6 +51,7 @@ begin
     -- combinational circuit which maps present state to correspongind lights
     comb: process (state)
     begin
+        Tl <= '0'; Ts <= '0';
         case state is
             when 0 =>
                 -- EW green and Zebra NS GREEN, all others RED
@@ -62,7 +64,6 @@ begin
 
                 -- start timer
                 Tl <= '1';
-                timeout <= timer();
             
             when 1 =>
                 -- E - yellow, turn off green
@@ -70,7 +71,6 @@ begin
 
                 -- start timer
                 Ts <= '1';
-                timeout <= timer();
             
             when 2 =>
                 -- E-red, turn off yellow
@@ -79,8 +79,7 @@ begin
                 zebraRed(0) <= '1'; zebraGreen(0) <= '0';
 
                 --start timer
-                Tl <= 1;
-                timeout <= timer();
+                Tl <= '1';
             
             when 3 =>
                 -- W-yellow, turn off green
@@ -88,7 +87,6 @@ begin
 
                 --start timer
                 Ts <= '1';
-                timeout <= timer();
 
             when 4 =>
                 -- W-red, turn off yellow
@@ -98,7 +96,6 @@ begin
 
                 --start timer
                 Tl <= '1';
-                timeout <= timer();
             
             when 5 =>
                 -- E-yellow, turn off green
@@ -106,7 +103,6 @@ begin
 
                 --start timer
                 Ts <= '1';
-                timeout <= timer();
 
             when 6 =>
                 --E-red, turnoff yellow
@@ -118,7 +114,6 @@ begin
 
                 --start timer
                 Tl <= '1';
-                timeout <= timer();
             
             when 7 =>
                 -- N-yellow, turnoff green
@@ -126,7 +121,6 @@ begin
 
                 --start timer
                 Ts <= '1';
-                timeout <= timer();
 
             when 8 =>
                 --N-red, turn off yellow
@@ -136,7 +130,6 @@ begin
 
                 --start timer
                 Tl <= '1';
-                timeout <= timer();
 
             when 9 =>
                 --S-yellow, turnoff green
@@ -144,7 +137,6 @@ begin
 
                 --start timer
                 Ts <= '1';
-                timeout <= timer();
             
             when 10 =>
                 --S-red, turn off yellow
@@ -154,42 +146,46 @@ begin
 
                 --start timer
                 Tl <= '1';
-                timeout <= timer();
 
             when 11 =>
                 --N-yellow, turn off green
                 yellow(1) <= '1'; green(1) <= '0';
 
                 --start timer
-                Tl <= '1';
-                timeout <= timer();      
+                Ts <= '1';
 
         end case;
-
     end process;
 
-    -- timer function
-    function timer() return std_logic is
-        variable count : integer := 0;
+    -- timer process
+    timer: process(Tl, Ts, clk)
+    variable count : integer;
+    begin
+        timeout <= '0';
+        count := 0;
         if Tl = '1' then
-            while count <= longCount loop
-                if rising_edge(clk) then
-                    count := count +1;
-                end if;
-            end loop;
-            Tl <= '0';
-
-        elsif Ts = '1' then
-            while count <= shortCount loop
-                if rising_edge(clk) then
+            for i in 1 to longCount loop
+                if rising_edge(clk) and count <= longCount then
                     count := count + 1;
                 end if;
-            end loop;
-            Ts <= '0';
-            
+        end loop;
+		timeout <= '1';
+        -- Tl <= '0';
+
+        elsif Ts = '1' then
+            -- timeout <= '0';
+            -- count := 0;
+            for i in 1 to shortCount loop
+                if rising_edge(clk) and count <= shortCount then
+                    count := count +1;
+                end if;
+        end loop;
+		  timeout <= '1';
+        -- Ts <= '0';
+                
         end if;
 
-    end function;
+    end process;
 
 end arch ; -- arch
 
